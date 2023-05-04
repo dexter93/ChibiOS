@@ -29,9 +29,11 @@
 /*===========================================================================*/
 /* Driver local definitions.                                                 */
 /*===========================================================================*/
-
+// reset to idle state: sda/scl keep high
 #define CHECK_ERROR(msg)                                                    \
   if ((msg) < (msg_t)0) {                                                   \
+    palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);            \
+    palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);            \
     palSetLine(i2cp->config->sda);                                          \
     palSetLine(i2cp->config->scl);                                          \
     return MSG_TIMEOUT;                                                     \
@@ -86,11 +88,13 @@ static inline void i2c_delay(I2CDriver *i2cp) {
 
 static inline msg_t i2c_check_arbitration(I2CDriver *i2cp) {
 
+  palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
+  i2c_delay(i2cp);
   if (palReadLine(i2cp->config->sda) == PAL_LOW) {
     i2cp->errors |= I2C_ARBITRATION_LOST;
     return MSG_RESET;
   }
-
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   return MSG_OK;
 }
 
@@ -107,6 +111,9 @@ static inline msg_t i2c_check_timeout(I2CDriver *i2cp) {
 
 static msg_t i2c_wait_clock(I2CDriver *i2cp) {
 
+  palSetLineMode(i2cp->config->scl, PAL_MODE_INPUT);
+  i2c_delay(i2cp);
+
   while (palReadLine(i2cp->config->scl) == PAL_LOW) {
     if ((i2cp->start != i2cp->end) &&
         (!osalTimeIsInRangeX(osalOsGetSystemTimeX(), i2cp->start, i2cp->end))) {
@@ -114,6 +121,8 @@ static msg_t i2c_wait_clock(I2CDriver *i2cp) {
     }
     i2c_delay(i2cp);
   }
+
+  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
   return MSG_OK;
 }
@@ -123,6 +132,9 @@ static inline msg_t i2c_write_start(I2CDriver *i2cp) {
   /* Arbitration check.*/
   CHECK_ERROR(i2c_check_arbitration(i2cp));
 
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
+
   palClearLine(i2cp->config->sda);
   i2c_delay(i2cp);
   palClearLine(i2cp->config->scl);
@@ -131,6 +143,9 @@ static inline msg_t i2c_write_start(I2CDriver *i2cp) {
 }
 
 static msg_t i2c_write_restart(I2CDriver *i2cp) {
+
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
   palSetLine(i2cp->config->sda);
   i2c_delay(i2cp);
@@ -146,6 +161,9 @@ static msg_t i2c_write_restart(I2CDriver *i2cp) {
 }
 
 static msg_t i2c_write_stop(I2CDriver *i2cp) {
+
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
   palClearLine(i2cp->config->sda);
   i2c_delay(i2cp);
@@ -168,6 +186,9 @@ static msg_t i2c_write_stop(I2CDriver *i2cp) {
 
 static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
+
   palWriteLine(i2cp->config->sda, bit);
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
@@ -189,6 +210,9 @@ static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 static msg_t i2c_read_bit(I2CDriver *i2cp) {
   msg_t bit;
 
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
+
   palSetLine(i2cp->config->sda);
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
@@ -197,7 +221,12 @@ static msg_t i2c_read_bit(I2CDriver *i2cp) {
   CHECK_ERROR(i2c_wait_clock(i2cp));
 
   i2c_delay(i2cp);
+
+  palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
+  i2c_delay(i2cp);
+
   bit = palReadLine(i2cp->config->sda);
+  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   palClearLine(i2cp->config->scl);
 
   return bit;
@@ -205,12 +234,13 @@ static msg_t i2c_read_bit(I2CDriver *i2cp) {
 
 static msg_t i2c_write_byte(I2CDriver *i2cp, uint8_t byte) {
   msg_t msg;
-  uint8_t mask;
 
   CHECK_ERROR(i2c_check_timeout(i2cp));
 
-  for (mask = 0x80U; mask > 0U; mask >>= 1U) {
-    CHECK_ERROR(i2c_write_bit(i2cp, (byte & mask) != 0));
+
+  for(uint8_t i = 0; i < 8; i++) {
+    unsigned bit = ((0x80 >> i) & byte);
+    CHECK_ERROR(i2c_write_bit(i2cp, bit));
   }
 
   msg = i2c_read_bit(i2cp);
