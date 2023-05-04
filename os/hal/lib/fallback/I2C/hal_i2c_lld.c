@@ -23,7 +23,7 @@
  */
 
 #include "hal.h"
-
+#include "debug.h"
 #if HAL_USE_I2C || defined(__DOXYGEN__)
 
 /*===========================================================================*/
@@ -87,48 +87,58 @@ static inline void i2c_delay(I2CDriver *i2cp) {
 }
 
 static inline msg_t i2c_check_arbitration(I2CDriver *i2cp) {
-
+  msg_t msg;
   palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
   i2c_delay(i2cp);
   if (palReadLine(i2cp->config->sda) == PAL_LOW) {
     i2cp->errors |= I2C_ARBITRATION_LOST;
+    msg = MSG_RESET;
+    uprintf("arbitration check failed! status: %ld\n",msg);
     return MSG_RESET;
   }
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+  msg = MSG_OK;
+  uprintf("timeout check passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
 static inline msg_t i2c_check_timeout(I2CDriver *i2cp) {
-
+  msg_t msg;
   if ((i2cp->start != i2cp->end) &&
       (!osalTimeIsInRangeX(osalOsGetSystemTimeX(), i2cp->start, i2cp->end))) {
     i2c_write_stop(i2cp);
+    msg = MSG_TIMEOUT;
+    uprintf("timeout check failed! status: %ld\n",msg);
     return MSG_TIMEOUT;
   }
-
+  msg = MSG_OK;
+  uprintf("timeout check passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
 static msg_t i2c_wait_clock(I2CDriver *i2cp) {
-
+  msg_t msg;
   palSetLineMode(i2cp->config->scl, PAL_MODE_INPUT);
   i2c_delay(i2cp);
 
   while (palReadLine(i2cp->config->scl) == PAL_LOW) {
     if ((i2cp->start != i2cp->end) &&
         (!osalTimeIsInRangeX(osalOsGetSystemTimeX(), i2cp->start, i2cp->end))) {
+      msg = MSG_TIMEOUT;
+      uprintf("wait clock failed! status: %ld\n",msg);
       return MSG_TIMEOUT;
     }
     i2c_delay(i2cp);
   }
 
   palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
-
+  msg = MSG_OK;
+  uprintf("wait clock passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
 static inline msg_t i2c_write_start(I2CDriver *i2cp) {
-
+  msg_t msg;
   /* Arbitration check.*/
   CHECK_ERROR(i2c_check_arbitration(i2cp));
 
@@ -138,12 +148,13 @@ static inline msg_t i2c_write_start(I2CDriver *i2cp) {
   palClearLine(i2cp->config->sda);
   i2c_delay(i2cp);
   palClearLine(i2cp->config->scl);
-
+  msg = MSG_OK;
+  uprintf("write start passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
 static msg_t i2c_write_restart(I2CDriver *i2cp) {
-
+  msg_t msg;
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
@@ -156,12 +167,13 @@ static msg_t i2c_write_restart(I2CDriver *i2cp) {
 
   i2c_delay(i2cp);
   i2c_write_start(i2cp);
-
+  msg = MSG_OK;
+  uprintf("write start passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
 static msg_t i2c_write_stop(I2CDriver *i2cp) {
-
+  msg_t msg;
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
@@ -180,12 +192,13 @@ static msg_t i2c_write_stop(I2CDriver *i2cp) {
   CHECK_ERROR(i2c_check_arbitration(i2cp));
 
   i2c_delay(i2cp);
-
+  msg = MSG_OK;
+  uprintf("write start passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
 static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
-
+  msg_t msg;
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
@@ -203,7 +216,8 @@ static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
   }
 
   palClearLine(i2cp->config->scl);
-
+  msg = MSG_OK;
+  uprintf("write bit passed! status: %ld\n",msg);
   return MSG_OK;
 }
 
@@ -228,13 +242,13 @@ static msg_t i2c_read_bit(I2CDriver *i2cp) {
   bit = palReadLine(i2cp->config->sda);
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   palClearLine(i2cp->config->scl);
-
+  uprintf("read bit passed! value: %ld\n",bit);
   return bit;
 }
 
 static msg_t i2c_write_byte(I2CDriver *i2cp, uint8_t byte) {
   msg_t msg;
-
+  msg_t status;
   CHECK_ERROR(i2c_check_timeout(i2cp));
 
 
@@ -244,6 +258,7 @@ static msg_t i2c_write_byte(I2CDriver *i2cp, uint8_t byte) {
   }
 
   msg = i2c_read_bit(i2cp);
+  uprintf("i2c ack check on i2c_write_byte: %ld\n",msg);
   CHECK_ERROR(msg);
 
   /* Checking for NACK.*/
@@ -251,25 +266,28 @@ static msg_t i2c_write_byte(I2CDriver *i2cp, uint8_t byte) {
     i2cp->errors |= I2C_ACK_FAILURE;
     return MSG_RESET;
   }
-
+  status = MSG_OK;
+  uprintf("i2c_write_byte complete! status: %ld\n",status);
   return MSG_OK;
 }
 
 static msg_t i2c_read_byte(I2CDriver *i2cp, unsigned nack) {
   msg_t byte;
   unsigned i;
-
+  msg_t status;
   CHECK_ERROR(i2c_check_timeout(i2cp));
 
   byte = 0U;
   for (i = 0; i < 8; i++) {
     msg_t msg = i2c_read_bit(i2cp);
+    uprintf("i2c read status on i2c_read_byte: %ld\n",msg);
     CHECK_ERROR(msg);
     byte = (byte << 1U) | msg;
   }
 
   CHECK_ERROR(i2c_write_bit(i2cp, nack));
-
+  status = MSG_OK;
+  uprintf("i2c_read_byte complete! status: %ld\n",status);
   return byte;
 }
 
