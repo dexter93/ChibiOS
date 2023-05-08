@@ -132,9 +132,6 @@ static inline msg_t i2c_write_start(I2CDriver *i2cp) {
   /* Arbitration check.*/
   CHECK_ERROR(i2c_check_arbitration(i2cp));
 
-  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
-  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
-
   palClearLine(i2cp->config->sda);
   i2c_delay(i2cp);
   palClearLine(i2cp->config->scl);
@@ -143,9 +140,6 @@ static inline msg_t i2c_write_start(I2CDriver *i2cp) {
 }
 
 static msg_t i2c_write_restart(I2CDriver *i2cp) {
-
-  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
-  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
   palSetLine(i2cp->config->sda);
   i2c_delay(i2cp);
@@ -161,9 +155,6 @@ static msg_t i2c_write_restart(I2CDriver *i2cp) {
 }
 
 static msg_t i2c_write_stop(I2CDriver *i2cp) {
-
-  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
-  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
   palClearLine(i2cp->config->sda);
   i2c_delay(i2cp);
@@ -186,9 +177,6 @@ static msg_t i2c_write_stop(I2CDriver *i2cp) {
 
 static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 
-  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
-  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
-
   palWriteLine(i2cp->config->sda, bit);
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
@@ -209,9 +197,6 @@ static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 
 static msg_t i2c_read_bit(I2CDriver *i2cp) {
   msg_t bit;
-
-  palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
-  palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
 
   palSetLine(i2cp->config->sda);
   i2c_delay(i2cp);
