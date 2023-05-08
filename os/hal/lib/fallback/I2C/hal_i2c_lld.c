@@ -135,6 +135,7 @@ static inline msg_t i2c_write_start(I2CDriver *i2cp) {
   palClearLine(i2cp->config->sda);
   i2c_delay(i2cp);
   palClearLine(i2cp->config->scl);
+  i2c_delay(i2cp);
 
   return MSG_OK;
 }
@@ -197,6 +198,7 @@ static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
   }
 
   palClearLine(i2cp->config->scl);
+  i2c_delay(i2cp);
 
   return MSG_OK;
 }
@@ -204,7 +206,7 @@ static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 static msg_t i2c_read_bit(I2CDriver *i2cp) {
   msg_t bit;
 
-  palSetLine(i2cp->config->sda);
+  palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
 
@@ -213,12 +215,10 @@ static msg_t i2c_read_bit(I2CDriver *i2cp) {
 
   i2c_delay(i2cp);
 
-  palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
-  i2c_delay(i2cp);
-
   bit = palReadLine(i2cp->config->sda);
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
   palClearLine(i2cp->config->scl);
+  i2c_delay(i2cp);
 
   return bit;
 }
