@@ -177,7 +177,13 @@ static msg_t i2c_write_stop(I2CDriver *i2cp) {
 
 static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 
-  palWriteLine(i2cp->config->sda, bit);
+  if (bit > PAL_LOW){
+    palSetLine(i2cp->config->sda);
+  }
+  else {
+    palClearLine(i2cp->config->sda);
+  }
+
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
   i2c_delay(i2cp);
@@ -224,7 +230,7 @@ static msg_t i2c_write_byte(I2CDriver *i2cp, uint8_t byte) {
 
 
   for(uint8_t i = 0; i < 8; i++) {
-    unsigned bit = ((0x80 >> i) & byte);
+    unsigned bit = ((0x80U >> i) & byte);
     CHECK_ERROR(i2c_write_bit(i2cp, bit));
   }
 
