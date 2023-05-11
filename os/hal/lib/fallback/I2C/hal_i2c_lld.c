@@ -178,12 +178,7 @@ static msg_t i2c_write_stop(I2CDriver *i2cp) {
 
 static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 
-  if (bit > PAL_LOW){
-    palSetLine(i2cp->config->sda);
-  }
-  else {
-    palClearLine(i2cp->config->sda);
-  }
+  palWriteLine(i2cp->config->sda, bit);
 
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
