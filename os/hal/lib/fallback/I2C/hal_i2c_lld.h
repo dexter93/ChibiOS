@@ -40,6 +40,16 @@
  * @{
  */
 /**
+ * @brief   Use Open-drain configuration.
+ * @details If set to @p TRUE then the driver expects the SDA and SCL
+ *          pins to be in open-drain configuration else it handles
+ *          I2C functionality by switching input and output state.
+ */
+#if !defined(SW_I2C_USE_OPENDRAIN) || defined(__DOXYGEN__)
+#define SW_I2C_USE_OPENDRAIN                FALSE
+#endif
+
+/**
  * @brief   Use OSAL delays.
  * @details If set to @p TRUE then delays are implemented using the
  *          thread-friendly delay function else a delay function must

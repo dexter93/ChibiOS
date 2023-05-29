@@ -29,15 +29,23 @@
 /*===========================================================================*/
 /* Driver local definitions.                                                 */
 /*===========================================================================*/
-// reset to idle state: sda/scl keep high
-#define CHECK_ERROR(msg)                                                    \
-  if ((msg) < (msg_t)0) {                                                   \
-    palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);            \
-    palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);            \
-    palSetLine(i2cp->config->sda);                                          \
-    palSetLine(i2cp->config->scl);                                          \
-    return MSG_TIMEOUT;                                                     \
-  }
+#if (SW_I2C_USE_OPENDRAIN == TRUE) || defined(__DOXYGEN__)
+#  define CHECK_ERROR(msg)                                                    \
+    if ((msg) < (msg_t)0) {                                                   \
+      palSetLine(i2cp->config->sda);                                          \
+      palSetLine(i2cp->config->scl);                                          \
+      return MSG_TIMEOUT;                                                     \
+    }
+#else
+#  define CHECK_ERROR(msg)                                                    \
+    if ((msg) < (msg_t)0) {                                                   \
+      palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);            \
+      palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);            \
+      palSetLine(i2cp->config->sda);                                          \
+      palSetLine(i2cp->config->scl);                                          \
+      return MSG_TIMEOUT;                                                     \
+    }
+#endif
 
 /*===========================================================================*/
 /* Driver constants.                                                         */
@@ -87,14 +95,17 @@ static inline void i2c_delay(I2CDriver *i2cp) {
 }
 
 static inline msg_t i2c_check_arbitration(I2CDriver *i2cp) {
-
+#if (SW_I2C_USE_OPENDRAIN == FALSE)
   palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
+#endif
   i2c_delay(i2cp);
   if (palReadLine(i2cp->config->sda) == PAL_LOW) {
     i2cp->errors |= I2C_ARBITRATION_LOST;
     return MSG_RESET;
   }
+#if (SW_I2C_USE_OPENDRAIN == FALSE)
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+#endif
   return MSG_OK;
 }
 
@@ -110,8 +121,9 @@ static inline msg_t i2c_check_timeout(I2CDriver *i2cp) {
 }
 
 static msg_t i2c_wait_clock(I2CDriver *i2cp) {
-
+#if (SW_I2C_USE_OPENDRAIN == FALSE)
   palSetLineMode(i2cp->config->scl, PAL_MODE_INPUT);
+#endif
   i2c_delay(i2cp);
 
   while (palReadLine(i2cp->config->scl) == PAL_LOW) {
@@ -121,9 +133,9 @@ static msg_t i2c_wait_clock(I2CDriver *i2cp) {
     }
     i2c_delay(i2cp);
   }
-
+#if (SW_I2C_USE_OPENDRAIN == FALSE)
   palSetLineMode(i2cp->config->scl, PAL_MODE_OUTPUT_PUSHPULL);
-
+#endif
   return MSG_OK;
 }
 
@@ -200,8 +212,9 @@ static msg_t i2c_write_bit(I2CDriver *i2cp, unsigned bit) {
 
 static msg_t i2c_read_bit(I2CDriver *i2cp) {
   msg_t bit;
-
+#if (SW_I2C_USE_OPENDRAIN == FALSE)
   palSetLineMode(i2cp->config->sda, PAL_MODE_INPUT);
+#endif
   i2c_delay(i2cp);
   palSetLine(i2cp->config->scl);
 
@@ -211,7 +224,9 @@ static msg_t i2c_read_bit(I2CDriver *i2cp) {
   i2c_delay(i2cp);
 
   bit = palReadLine(i2cp->config->sda);
+#if (SW_I2C_USE_OPENDRAIN == FALSE)
   palSetLineMode(i2cp->config->sda, PAL_MODE_OUTPUT_PUSHPULL);
+#endif
   palClearLine(i2cp->config->scl);
   i2c_delay(i2cp);
 
@@ -223,12 +238,17 @@ static msg_t i2c_write_byte(I2CDriver *i2cp, uint8_t byte) {
 
   CHECK_ERROR(i2c_check_timeout(i2cp));
 
-
+#if (SW_I2C_USE_OPENDRAIN == TRUE) || defined(__DOXYGEN__)
+  uint8_t mask;
+  for (mask = 0x80U; mask > 0U; mask >>= 1U) {
+    CHECK_ERROR(i2c_write_bit(i2cp, (byte & mask) != 0));
+  }
+#else
   for(uint8_t i = 0; i < 8; i++) {
     unsigned bit = ((0x80U >> i) & byte);
     CHECK_ERROR(i2c_write_bit(i2cp, bit));
   }
-
+#endif
   msg = i2c_read_bit(i2cp);
   CHECK_ERROR(msg);
 
